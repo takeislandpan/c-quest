@@ -1,6 +1,6 @@
 // 画面の流れ: 冒頭(PC) → 転生 → 地図 → コードを書く → (魔導書が開かない) → 戦闘 → 勝ち/負け
 import { preloadCompiler, compileAndRun } from './compiler.js';
-import { simulate, turnMessages, turnSummary, readStats, attackDamage } from './battle.js';
+import { simulate, turnMessages, turnSummary, readStats, attackDamage, guardCost, GUARD_DEFAULT } from './battle.js';
 import { explain } from './errors.js';
 import { highlightLine, highlight } from './highlight.js';
 import { STAGE1, PLAYER } from './data/stage1.js';
@@ -87,6 +87,7 @@ function statusHtml(hp, mp, p = null, enemy = null) {
   return `<div class="win status" ${p ? 'style="width:440px"' : ''}>
     ${p ? `<span>あなた　${hpmp}</span>` : `<span>あなた</span><span>${hpmp}</span>`}
     ${p ? `<span>こうげき <span class="num">${p.atk}</span>　ぼうぎょ <span class="num">${p.def}</span>　ぶき <span class="${p.weapon.bare ? 'bad' : ''}">${esc(p.weapon.name)}${p.weapon.code ? `（'${p.weapon.code}'）` : ''}</span></span>
+    <span class="sub">SP ${p.used} / ${p.sp}${p.guard !== GUARD_DEFAULT ? `　guard ×${p.guard}（SP ${guardCost(p.guard)}）` : ''}</span>
     ${enemy ? `<span class="sub">attack 1回：${esc(damageExplain(p, enemy))}</span>` : ''}` : ''}
   </div>`;
 }

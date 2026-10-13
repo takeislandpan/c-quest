@@ -45,7 +45,7 @@ export function parseDiagnostics(log) {
 }
 
 // 戻り値: { ok:false, diagnostics } または { ok:true, warnings, outputLines:[{text,line}], vars, leaks, memEvents, exitCode }
-// vars: 最初の printf の時点の attack / defense / hp / weapon（weapon は文字コード）。printf が1回もなければ null
+// vars: 最初の printf の時点の attack / defense / hp / weapon / guard（weapon は文字コード）。printf が1回もなければ null
 export async function compileAndRun(source) {
   const check = await clang(source, []);
   const diagnostics = parseDiagnostics(check.log);
@@ -80,7 +80,7 @@ export async function compileAndRun(source) {
         const l = errBuf.slice(0, i); errBuf = errBuf.slice(i + 1);
         if (!l.startsWith('\x01')) continue;
         const [kind, line, ptr, ...rest] = l.slice(1).split(' ');
-        if (kind === 'vars') vars = { attack: +line, defense: +ptr, hp: +rest[0], weapon: +rest[1] };
+        if (kind === 'vars') vars = { attack: +line, defense: +ptr, hp: +rest[0], weapon: +rest[1], guard: +rest[2] };
         else if (kind === 'line') lineQueue.push(+line);
         else { events.push({ kind, line: +line, ptr }); if (kind === 'malloc') allocs.set(ptr, +line); else allocs.delete(ptr); }
       }

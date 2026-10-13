@@ -17,7 +17,11 @@ export const WEAPONS = {
   M: { name: '杖', mult: 1.0, cost: 3, ignoreDef: true },
 };
 const OVERLOAD_STUN = 3;
+// guard（守ったターンに受けるダメージの割合）。書かなければ 0.5。0.1 下げるごとに SP 1（端数は切り上げ）。0.2 より下げられない
+export const GUARD_DEFAULT = 0.5, GUARD_MIN = 0.2;
+export const guardCost = g => (g < GUARD_DEFAULT ? Math.ceil((GUARD_DEFAULT - g) * 10 - 1e-9) : 0);
 
+const fmt = x => String(Math.round(x * 1000) / 1000);
 const charLabel = c => (c >= 33 && c <= 126 ? `'${String.fromCharCode(c)}'` : `文字コード ${c}`);
 
 // 第2面から: プログラムの変数（最初の printf の時点）から自分の強さを決める。
@@ -25,7 +29,7 @@ const charLabel = c => (c >= 33 && c <= 126 ? `'${String.fromCharCode(c)}'` : `�
 // 決定事項: ゲーム側は合計上限のみ検証。名前違い・書き忘れは 0 扱い。
 // ルール違反は「必ず負け、ただし理由はログで分かる」。
 export function readStats(vars, cfg) {
-  const v = vars ?? { attack: 0, defense: 0, hp: 0, weapon: 0 };
+  const v = vars ?? { attack: 0, defense: 0, hp: 0, weapon: 0, guard: GUARD_DEFAULT };
   const checks = [];
   const stat = name => {
     const x = v[name];
@@ -34,7 +38,10 @@ export function readStats(vars, cfg) {
     return x;
   };
   const atk = stat('attack'), def = stat('defense'), hp = stat('hp');
-  const used = atk + def + hp;
+  let guard = Number.isFinite(v.guard) ? v.guard : GUARD_DEFAULT;
+  if (guard < GUARD_MIN) { checks.push({ text: `guard ${fmt(guard)} は 下げすぎ → ${GUARD_MIN} として あつかう`, bad: true }); guard = GUARD_MIN; }
+  if (guard > 1) { checks.push({ text: `guard ${fmt(guard)} は 1 より 大きい → 1 として あつかう`, bad: true }); guard = 1; }
+  const used = atk + def + hp + guardCost(guard);
 
   let weapon;
   const code = v.weapon, ch = String.fromCharCode(code);
@@ -46,7 +53,7 @@ export function readStats(vars, cfg) {
     else checks.push({ text: `weapon の ${charLabel(code)} は 魔導書に ない武器 → 素手（ダメージ 0）`, bad: true });
   }
 
-  const player = { hp, mp: cfg.mp, atk, def, weapon, sp: cfg.sp, used };
+  const player = { hp, mp: cfg.mp, atk, def, weapon, guard, sp: cfg.sp, used };
   if (used > cfg.sp) {
     checks.unshift({ text: `SP ${used} / ${cfg.sp}：つかいすぎ！ 魔力暴走（HP 1、さいしょの ${OVERLOAD_STUN}ターン うごけない）`, bad: true });
     Object.assign(player, { hp: 1, stun: OVERLOAD_STUN, overload: true });
@@ -112,14 +119,16 @@ export function simulate(outputs, player, enemy) {
     }
 
     // 敵の行動
-    let kind = 'hit', raw = enemy.atk;
+    let kind = 'hit', raw = enemy.atk, pierce = false;
     const c = enemy.charge, m = enemy.mp;
     if (m) {
-      if (emp >= m.cost) { kind = 'strong'; raw = enemy.atk * 2; emp -= m.cost; }
+      // m.damage があれば防御を貫く決まったダメージ、なければ攻撃力の2倍
+      if (emp >= m.cost) { kind = 'strong'; raw = m.damage ?? enemy.atk * 2; pierce = m.damage != null; emp -= m.cost; }
       emp = Math.min(m.max, emp + m.regen);
     } else if (c && t % c.every === 0) { kind = 'charge'; raw = c.damage; }
-    const base = Math.max(1, raw - def);
-    const dmg = guarding ? Math.floor(base / 2) : base;
+    const base = pierce ? raw : Math.max(1, raw - def);
+    // guard はダメージ × 割合の切り捨て（int に入れるのと同じ）
+    const dmg = guarding ? Math.floor(base * (player.guard ?? GUARD_DEFAULT)) : base;
     hp = Math.max(0, hp - dmg);
     turn.events.push({ who: 'enemy', kind, raw: base, damage: dmg, guarded: guarding });
     if (c && !m && kind !== 'charge' && (t + 1) % c.every === 0) turn.events.push({ who: 'enemy', kind: 'warn' });
