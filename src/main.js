@@ -467,7 +467,8 @@ function showHistory(id) {
 function renderCode(id, { intro = true } = {}) {
   const b = findBattle(id);
   const rec = battleRecord(save, id);
-  const code = rec.code ?? b.template;
+  // テンプレートを作り直したあとは、古いテンプレートから書きかけたコードではなく新しいテンプレートを出す
+  const code = rec.code != null && rec.base === b.template ? rec.code : b.template;
   const hExcerpt = visibleMagic().split('\n');
   const root = show(`<div class="screen">
     <section class="col" style="width:540px; flex-shrink:0">
@@ -512,14 +513,14 @@ function renderCode(id, { intro = true } = {}) {
   if (chapter > 0) hx.scrollTop = chapter * 26;
   ta.value = code;
   wireEditor(ta, root.querySelector('[data-gutter]'));
-  ta.addEventListener('input', () => { rec.code = ta.value; persist(); });
+  ta.addEventListener('input', () => { rec.code = ta.value; rec.base = b.template; persist(); });
 
   const showTask = () => setMsg(msg, [`＊${esc(b.task)}`, '<span class="sub">かけたら えいしょう（Ctrl+Enter）</span>']);
   let busy = false;
   const cast = async () => {
     if (busy) return;
     busy = true;
-    rec.code = ta.value; persist();
+    rec.code = ta.value; rec.base = b.template; persist();
     setMsg(msg, ['＊あなたは 魔導書を ひらいた……', compilerReady ? '' : '<span class="sub">（じゅんび中… しばらく まってね）</span>']);
     const res = await compileAndRun(ta.value);
     busy = false;
