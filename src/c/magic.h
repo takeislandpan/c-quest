@@ -16,7 +16,7 @@
 /*   int  defense = 10;   防御力              */
 /*   int  hp      = 10;   体力                */
 /*   char weapon  = 'S';  武器（1文字）        */
-/* attack + defense + hp は SP まで（この面は 30） */
+/* attack + defense + hp は SP まで（今は 30）     */
 /* 1 SP で 1 上がる。こえると 魔力暴走        */
 
 /* 武器（大文字1文字）                         */
