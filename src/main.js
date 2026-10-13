@@ -1,6 +1,6 @@
 // 画面の流れ: 冒頭(PC) → 転生 → 地図 → コードを書く → (魔導書が開かない) → 戦闘 → 勝ち/負け
 import { preloadCompiler, compileAndRun } from './compiler.js';
-import { simulate, turnMessages, turnSummary, readStats, attackDamage, guardCost, GUARD_DEFAULT } from './battle.js';
+import { simulate, turnMessages, turnSummary, readStats, attackDamage, guardCost, GUARD_DEFAULT, spBreakdown } from './battle.js';
 import { explain } from './errors.js';
 import { highlightLine, highlight } from './highlight.js';
 import { STAGE1, PLAYER } from './data/stage1.js';
@@ -87,7 +87,7 @@ function statusHtml(hp, mp, p = null, enemy = null) {
   return `<div class="win status" ${p ? 'style="width:440px"' : ''}>
     ${p ? `<span>あなた　${hpmp}</span>` : `<span>あなた</span><span>${hpmp}</span>`}
     ${p ? `<span>こうげき <span class="num">${p.atk}</span>　ぼうぎょ <span class="num">${p.def}</span>　ぶき <span class="${p.weapon.bare ? 'bad' : ''}">${esc(p.weapon.name)}${p.weapon.code ? `（'${p.weapon.code}'）` : ''}</span></span>
-    <span class="sub">SP ${p.used} / ${p.sp}${p.guard !== GUARD_DEFAULT ? `　guard ×${p.guard}（SP ${guardCost(p.guard)}）` : ''}</span>
+    <span class="sub ${p.overload ? 'bad' : ''}">SP ${p.used} / ${p.sp}（${esc(spBreakdown(p))}）</span>
     ${enemy ? `<span class="sub">attack 1回：${esc(damageExplain(p, enemy))}</span>` : ''}` : ''}
   </div>`;
 }
@@ -775,7 +775,12 @@ function renderDefeat(b, code, turns, result, firstLose, player, checks) {
     if (rec.hintsUsed < b.hints.length) { rec.hintsUsed++; persist(); }
     setMsg(msg, [`<span class="speaker">師匠「</span>${esc(b.hints[i])}<span class="speaker">」</span>`, `<span class="sub">ヒント ${i + 1} / ${b.hints.length}</span>`]);
   });
-  const lines = firstLose && b.afterLose ? b.afterLose : [['師匠', '……まったく、世話の焼ける。立てるか。'], ['師匠', 'ログを見ろ。何ターン目に、何が起きた？']];
+  const lines = player.overload ? [
+      ['師匠', `力の合計が SP を こえている。${player.used} / ${player.sp} だ。魔力が暴れて、身動きが とれなかったな。`],
+      ['師匠', `内訳は ${spBreakdown(player)}。guard を 下げた分の SP も 合計に 入るぞ。`],
+      ['師匠', 'どこかを 減らして、合計を おさめろ。'],
+    ]
+    : firstLose && b.afterLose ? b.afterLose : [['師匠', '……まったく、世話の焼ける。立てるか。'], ['師匠', 'ログを見ろ。何ターン目に、何が起きた？']];
   talk(msg, lines).then(() => { setMsg(msg, ['＊なおしたら もういちど えいしょう']); root.querySelector('[data-back]').focus(); });
 }
 

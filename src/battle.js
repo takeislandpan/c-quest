@@ -21,6 +21,9 @@ const OVERLOAD_STUN = 3;
 export const GUARD_DEFAULT = 0.5, GUARD_MIN = 0.2;
 export const guardCost = g => (g < GUARD_DEFAULT ? Math.ceil((GUARD_DEFAULT - g) * 10 - 1e-9) : 0);
 
+// SP の内訳（例: 13 + 5 + 12 + guard 0.3 の 2）
+export const spBreakdown = p => `${p.atk} + ${p.def} + ${p.hp0 ?? p.hp}${guardCost(p.guard) ? ` + guard ${fmt(p.guard)} の ${guardCost(p.guard)}` : ''}`;
+
 const fmt = x => String(Math.round(x * 1000) / 1000);
 const charLabel = c => (c >= 33 && c <= 126 ? `'${String.fromCharCode(c)}'` : `文字コード ${c}`);
 
@@ -53,9 +56,9 @@ export function readStats(vars, cfg) {
     else checks.push({ text: `weapon の ${charLabel(code)} は 魔導書に ない武器 → 素手（ダメージ 0）`, bad: true });
   }
 
-  const player = { hp, mp: cfg.mp, atk, def, weapon, guard, sp: cfg.sp, used };
+  const player = { hp, hp0: hp, mp: cfg.mp, atk, def, weapon, guard, sp: cfg.sp, used };
   if (used > cfg.sp) {
-    checks.unshift({ text: `SP ${used} / ${cfg.sp}：つかいすぎ！ 魔力暴走（HP 1、さいしょの ${OVERLOAD_STUN}ターン うごけない）`, bad: true });
+    checks.unshift({ text: `SP ${used} / ${cfg.sp}（${spBreakdown(player)}）：つかいすぎ！ 魔力暴走（HP 1、さいしょの ${OVERLOAD_STUN}ターン うごけない）`, bad: true });
     Object.assign(player, { hp: 1, stun: OVERLOAD_STUN, overload: true });
   }
   return { player, checks };
