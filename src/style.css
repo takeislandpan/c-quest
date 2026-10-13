@@ -1,0 +1,150 @@
+/* ドラクエ風: 黒地に白枠のウィンドウ。1280×800 の画面を窓の大きさに合わせて拡大縮小する。 */
+:root {
+  --bg: #000;
+  --panel: #000;
+  --code-bg: #0b0e1e;
+  --scene: #10162e;
+  --text: #fff;
+  --muted: #b9c0d4;
+  --dim: #6b7390;
+  --gutter: #5d6680;
+  --gold: #ffd166;
+  --hl: #3a3214;
+  --red: #ff6b6b;
+  --red-soft: #ffb3b3;
+  --green: #9fdc9a;
+  --violet: #c9a0ff;
+  --lich: #c9b8ec;
+  --dot: 'DotGothic16', sans-serif;
+  --mono: 'M PLUS 1 Code', monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+body { font-family: var(--dot); }
+button { font: inherit; color: inherit; }
+
+#viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+#stage { width: 1280px; height: 800px; flex-shrink: 0; position: relative; transform-origin: center center; }
+.screen { position: absolute; inset: 0; padding: 16px; display: flex; gap: 16px; font-size: 16px; }
+
+.win { border: 3px solid var(--text); border-radius: 10px; background: var(--panel); }
+.win-title { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 2px solid var(--text); flex-shrink: 0; }
+.sub { font-size: 13px; color: var(--muted); }
+.mono { font-family: var(--mono); }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.row { display: flex; gap: 12px; }
+.grow { flex-grow: 1; }
+
+/* コマンド窓 */
+.cmds { width: 220px; flex-shrink: 0; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+.cmd { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 6px 0 26px; border: none; background: transparent; font-size: 20px; cursor: pointer; text-align: left; position: relative; }
+.cmd:hover, .cmd:focus-visible { outline: none; color: #ffe08a; }
+.cmd:hover::before, .cmd:focus-visible::before { content: ''; position: absolute; left: 6px; top: 50%; margin-top: -7px; border-left: 12px solid currentColor; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.cmd:disabled { color: var(--dim); cursor: default; }
+.cmd:disabled::before { display: none; }
+
+/* メッセージ窓 */
+.msg { flex-grow: 1; padding: 18px 22px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; }
+.msg p { margin: 0; font-size: 18px; line-height: 1.8; }
+.msg .speaker { color: var(--lich); }
+.msg .speaker.you { color: var(--gold); }
+.msg .more { position: absolute; right: 18px; bottom: 10px; animation: blink 1s steps(2) infinite; }
+.msg.clickable { cursor: pointer; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ステータス窓 */
+.status { width: 200px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.status .num { font-family: var(--mono); }
+.status .low { color: var(--gold); }
+.lichmp { align-self: flex-start; padding: 6px 10px; border: 2px solid var(--gutter); border-radius: 8px; font-family: var(--mono); font-size: 12px; color: #8e9ab0; }
+.lichmp.revealed { color: var(--lich); border-color: var(--lich); }
+
+/* 敵の場所 */
+.scene { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 10px; background: var(--scene); min-height: 0; }
+.sprite { width: 336px; height: 336px; image-rendering: pixelated; }
+.sprite.hit { animation: hit .35s steps(2) 2; }
+.sprite.gone { opacity: 0; transition: opacity .8s; }
+@keyframes hit { 50% { opacity: 0; } }
+.hpbar { width: 160px; height: 8px; border: 1px solid var(--text); border-radius: 4px; overflow: hidden; }
+.hpbar > div { height: 100%; background: var(--text); transition: width .3s; }
+.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* エディタ */
+.editor { flex-grow: 1; display: flex; font-family: var(--mono); font-size: 15px; line-height: 28px; min-height: 0; overflow: hidden; }
+.editor .gutter { width: 44px; flex-shrink: 0; text-align: right; padding: 10px 10px 0 0; color: var(--gutter); white-space: pre; overflow: hidden; }
+.editor textarea { flex-grow: 1; padding: 10px 10px 10px 10px; border: none; outline: none; resize: none; background: transparent; color: var(--text); font: inherit; line-height: inherit; white-space: pre; tab-size: 4; caret-color: var(--text); }
+.editor textarea::placeholder { color: var(--dim); }
+
+.codeview { display: flex; flex-direction: column; padding: 8px 0; font-family: var(--mono); font-size: 15px; line-height: 28px; overflow: auto; }
+.codeview .ln { padding-left: 12px; white-space: pre; color: var(--dim); }
+.codeview .ln.ran { color: var(--text); }
+.codeview .ln.cur { padding-left: 9px; background: var(--hl); border-left: 3px solid var(--gold); color: var(--text); }
+.codeview .ln.err { padding-left: 9px; background: #3a1414; border-left: 3px solid var(--red); color: var(--text); }
+.codeview .no { display: inline-block; width: 28px; color: var(--gutter); }
+.codeview .tag { color: #7cc98a; margin-left: 12px; }
+.codeview .cur .tag { color: var(--gold); }
+
+.hfile { font-family: var(--mono); font-size: 14px; line-height: 26px; padding: 8px 12px; white-space: pre; overflow: auto; color: #8e9ab0; }
+
+/* 戦闘ログ表 */
+.log { flex-grow: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.log .rows { overflow: auto; }
+.log .r { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.4fr) 44px 40px; column-gap: 8px; padding: 8px 12px; font-size: 15px; }
+.log .r.head { font-size: 13px; color: var(--muted); }
+.log .r.cur { padding-left: 9px; background: var(--hl); border-left: 3px solid var(--gold); }
+.log .bad { color: var(--red); }
+
+/* 魔導書が開かない */
+.errbox { padding: 14px 18px; border: 2px solid var(--red); border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+.errbox pre { margin: 0; font-family: var(--mono); font-size: 14px; line-height: 1.6; color: var(--red-soft); white-space: pre-wrap; }
+.errbox .jp { font-size: 18px; color: var(--gold); }
+
+/* 重ねる窓（魔導書を大きく開く等） */
+.overlay { position: absolute; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.overlay > .win { width: 900px; max-height: 720px; display: flex; flex-direction: column; }
+
+.btn { min-height: 44px; padding: 0 16px; border: 2px solid var(--text); border-radius: 8px; background: #000; cursor: pointer; }
+.btn:hover, .btn:focus-visible { color: #ffe08a; border-color: #ffe08a; outline: none; }
+.btn.quiet { border-color: var(--gutter); color: #d6dbe8; }
+
+/* 地図 */
+.battle-list .item { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 8px 0 28px; border: none; background: transparent; width: 100%; text-align: left; cursor: pointer; font-size: 18px; position: relative; }
+.battle-list .item:disabled { color: var(--dim); cursor: default; }
+.battle-list .item.sel { color: var(--gold); }
+.battle-list .item.sel::before { content: ''; position: absolute; left: 8px; top: 50%; margin-top: -7px; border-left: 12px solid currentColor; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.chip { padding: 4px 10px; border: 2px solid var(--gutter); border-radius: 6px; font-size: 14px; }
+.chip.err { border-color: var(--red); color: var(--red-soft); }
+.bars { display: flex; align-items: flex-end; gap: 10px; height: 60px; }
+.bars > div { width: 22px; background: var(--text); }
+
+/* 冒頭のPC画面（ここだけ現実の見た目） */
+.pc { position: absolute; inset: 0; display: flex; flex-direction: column; background: #1d2029; font-family: 'Noto Sans JP', sans-serif; color: #1f2430; }
+.pc .bar { height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #2b2f3a; color: #c9cfdb; font-size: 13px; }
+.pc .dotc { width: 12px; height: 12px; border-radius: 50%; }
+.pc .tab { margin-left: 14px; padding: 4px 14px; border-radius: 6px 6px 0 0; background: #f4f5f8; color: #1f2430; }
+.pc .body { flex-grow: 1; display: flex; min-height: 0; background: #f4f5f8; }
+.pc article { width: 520px; flex-shrink: 0; padding: 32px 36px; display: flex; flex-direction: column; gap: 16px; border-right: 1px solid #d9dce3; }
+.pc h1 { margin: 0; font-size: 28px; line-height: 1.4; }
+.pc p { margin: 0; font-size: 16px; line-height: 1.9; }
+.pc .sample { margin: 0; padding: 14px 16px; border-radius: 8px; background: #fff; border: 1px solid #d9dce3; font-family: var(--mono); font-size: 15px; line-height: 1.7; white-space: pre; color: #1f2430; }
+.pc .sample .s { color: #2f7d32; } .pc .sample .k { color: #7b3fb5; } .pc .sample .p { color: #b05a00; }
+.pc section { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; padding: 24px; gap: 16px; }
+.pc .ed { flex-grow: 1; display: flex; flex-direction: column; border-radius: 8px; background: #fff; border: 1px solid #d9dce3; overflow: hidden; }
+.pc .ed .name { padding: 8px 14px; border-bottom: 1px solid #e3e5ea; font-family: var(--mono); font-size: 14px; color: #4b5263; display: flex; align-items: center; }
+.pc .editor { font-size: 18px; line-height: 34px; color: #1f2430; }
+.pc .editor .gutter { color: #a0a6b4; }
+.pc .editor textarea { color: #1f2430; caret-color: #1f2430; }
+.pc .editor textarea::placeholder { color: #a0a6b4; }
+.pc .term { height: 190px; flex-shrink: 0; border-radius: 8px; background: #11131a; color: #d6dbe8; padding: 12px 16px; font-family: var(--mono); font-size: 15px; line-height: 26px; overflow: auto; cursor: text; }
+.pc .term .prompt { color: #8e9ab0; }
+.pc .term .err { color: #ff9b9b; white-space: pre-wrap; }
+.pc .term .glitch { color: var(--lich); }
+.pc .term input { background: transparent; border: none; outline: none; color: #d6dbe8; font: inherit; width: 50%; }
+.pc .runbtn { margin-left: auto; padding: 4px 12px; border-radius: 6px; border: 1px solid #c5c9d3; background: #fff; color: #1f2430; font-size: 13px; cursor: pointer; }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 20; }
+.flash.on { animation: flash 2.4s forwards; }
+@keyframes flash { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 1; } }
+.fadein { animation: fadein 1.2s; }
+@keyframes fadein { from { opacity: 0; } }

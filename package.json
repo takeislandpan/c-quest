@@ -1,0 +1,12 @@
+{
+  "name": "c-quest",
+  "private": true,
+  "type": "module",
+  "description": "C言語を書いて戦うドラクエ風学習ゲーム",
+  "dependencies": {
+    "@yowasp/clang": "22.0.0-git20542-10"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 8765"
+  }
+}
