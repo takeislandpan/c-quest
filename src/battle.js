@@ -56,7 +56,7 @@ export function readStats(vars, cfg) {
     else checks.push({ text: `weapon の ${charLabel(code)} は 魔導書に ない武器 → 素手（ダメージ 0）`, bad: true });
   }
 
-  const player = { hp, hp0: hp, mp: cfg.mp, atk, def, weapon, guard, sp: cfg.sp, used };
+  const player = { hp, hp0: hp, mp: cfg.mp, guardMp: cfg.guardMp ?? SPELLS.guard.mp, atk, def, weapon, guard, sp: cfg.sp, used };
   if (used > cfg.sp) {
     checks.unshift({ text: `SP ${used} / ${cfg.sp}（${spBreakdown(player)}）：つかいすぎ！ 魔力暴走（HP 1、さいしょの ${OVERLOAD_STUN}ターン うごけない）`, bad: true });
     Object.assign(player, { hp: 1, stun: OVERLOAD_STUN, overload: true });
@@ -92,7 +92,7 @@ export function simulate(outputs, player, enemy) {
     const turn = { turn: t, line: out.line, spell: out.text, hpBefore: hp, mpBefore: mp, ehpBefore: ehp, empBefore: emp, events: [] };
     let guarding = false;
     const known = SPELLS[out.text];
-    const cost = out.text === 'attack' ? atkCost : known ? known.mp : MISFIRE_MP;
+    const cost = out.text === 'attack' ? atkCost : out.text === 'guard' ? (player.guardMp ?? SPELLS.guard.mp) : known ? known.mp : MISFIRE_MP;
 
     if (t <= (player.stun ?? 0)) {
       turn.events.push({ who: 'you', kind: 'stunned' });

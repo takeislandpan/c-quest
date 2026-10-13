@@ -9,7 +9,7 @@ const stats = (a, d, h, w = "'S'") => [`int attack = ${a};`, `int defense = ${d}
 const casts = n => Array(n).fill('printf("attack\\n");');
 
 // この面では、強さをプログラムの変数から読む（合計 SP まで）
-export const PLAYER2 = { sp: 30, mp: 10 };
+export const PLAYER2 = { sp: 30, mp: 10, guardMp: 0 };
 
 export const STAGE2 = {
   id: 'stage2',

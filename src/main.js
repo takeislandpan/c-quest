@@ -114,7 +114,7 @@ function spStatusHtml(cfg) {
 // その戦闘での自分の強さ。第1面は固定、第2面からはプログラムの変数から読む
 function playerFor(b, res) {
   if (b.stageIndex === 0) return { player: { ...PLAYER }, checks: [] };
-  return readStats(res?.vars, b.stats ?? b.stage.stats);
+  return readStats(res?.vars, { ...b.stage.stats, ...b.stats });
 }
 
 // 魔導書は面が進むとページ（章）が増える
