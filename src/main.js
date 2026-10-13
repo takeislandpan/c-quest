@@ -1,6 +1,6 @@
 // 画面の流れ: 冒頭(PC) → 転生 → 地図 → コードを書く → (魔導書が開かない) → 戦闘 → 勝ち/負け
 import { preloadCompiler, compileAndRun } from './compiler.js';
-import { simulate, turnMessages, turnSummary, readStats, attackDamage, guardCost, GUARD_DEFAULT, spBreakdown } from './battle.js';
+import { simulate, turnMessages, turnSummary, readStats, attackDamage, guardCost, GUARD_DEFAULT, GUARD_MIN, spBreakdown } from './battle.js';
 import { explain } from './errors.js';
 import { highlightLine, highlight } from './highlight.js';
 import { STAGE1, PLAYER } from './data/stage1.js';
@@ -102,13 +102,26 @@ function damageExplain(p, enemy) {
   return `${s} −防御${enemy.def ?? 0} = ${attackDamage(p, enemy)}　MP${w.cost}`;
 }
 
-// 第2面からの「SP / MP」表示（書く前なので強さはまだ決まっていない）
-function spStatusHtml(cfg) {
-  return `<div class="win status">
-    <span>あなた</span>
-    <span>SP <span class="num">${cfg.sp}</span>　MP <span class="num">${cfg.mp}</span></span>
-    <span class="sub">SP を attack / defense / hp に わける</span>
+// 第2面からの「SP / MP」表示。書いている途中のコードから SP の わりふりを見せる（目安。本当の値は唱えたときに読む）
+function spStatusHtml(cfg, code = '') {
+  return `<div class="win status" style="width:300px">
+    <span>あなた　SP <span class="num">${cfg.sp}</span>　MP <span class="num">${cfg.mp}</span></span>
+    <div data-sp style="display:flex; flex-direction:column; gap:2px">${spPlanHtml(cfg, code)}</div>
   </div>`;
+}
+function spPlanHtml(cfg, code) {
+  const val = name => {
+    const m = code.match(new RegExp(`\\b(?:int|double)\\s+${name}\\s*=\\s*(-?\\d+(?:\\.\\d+)?)\\s*;`));
+    return m ? Number(m[1]) : null;
+  };
+  const a = val('attack'), d = val('defense'), h = val('hp'), g = val('guard');
+  const n = x => (x == null ? '?' : Math.max(0, Math.trunc(x)));
+  const gc = g == null ? 0 : guardCost(Math.min(1, Math.max(GUARD_MIN, g)));
+  const total = [a, d, h].reduce((t, x) => t + (x == null ? 0 : Math.max(0, Math.trunc(x))), 0) + gc;
+  const over = total > cfg.sp;
+  return `<span class="sub">attack <span class="num">${n(a)}</span>　defense <span class="num">${n(d)}</span>　hp <span class="num">${n(h)}</span></span>
+    ${g != null ? `<span class="sub">guard ${g} → SP <span class="num">${gc}</span>${gc ? '（0.1 下げるごとに 1）' : '（0.5 なら 0）'}</span>` : ''}
+    <span class="${over ? 'bad' : 'sub'}">ごうけい <span class="num">${total}</span> / ${cfg.sp}${over ? '　つかいすぎ！' : total < cfg.sp ? `　のこり ${cfg.sp - total}` : ''}</span>`;
 }
 
 // その戦闘での自分の強さ。第1面は固定、第2面からはプログラムの変数から読む
@@ -486,7 +499,7 @@ function renderCode(id, { intro = true } = {}) {
     </section>
     <section class="col grow">
       <div class="row" style="align-items:stretch">
-        ${b.stageIndex === 0 ? statusHtml(PLAYER.hp, PLAYER.mp) : spStatusHtml(b.stats ?? b.stage.stats)}
+        ${b.stageIndex === 0 ? statusHtml(PLAYER.hp, PLAYER.mp) : spStatusHtml({ ...b.stage.stats, ...b.stats }, code)}
         <div class="grow"></div>
         <div class="lichmp">${LICH_GARBLED}</div>
       </div>
@@ -514,7 +527,11 @@ function renderCode(id, { intro = true } = {}) {
   if (chapter > 0) hx.scrollTop = chapter * 26;
   ta.value = code;
   wireEditor(ta, root.querySelector('[data-gutter]'));
-  ta.addEventListener('input', () => { rec.code = ta.value; rec.base = b.template; persist(); });
+  ta.addEventListener('input', () => {
+    rec.code = ta.value; rec.base = b.template; persist();
+    const sp = root.querySelector('[data-sp]');
+    if (sp) sp.innerHTML = spPlanHtml({ ...b.stage.stats, ...b.stats }, ta.value);
+  });
 
   const showTask = () => setMsg(msg, [`＊${esc(b.task)}`, '<span class="sub">かけたら えいしょう（Ctrl+Enter）</span>']);
   let busy = false;
