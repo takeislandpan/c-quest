@@ -119,8 +119,8 @@ function spPlanHtml(cfg, code) {
   const gc = g == null ? 0 : guardCost(Math.min(1, Math.max(GUARD_MIN, g)));
   const total = [a, d, h].reduce((t, x) => t + (x == null ? 0 : Math.max(0, Math.trunc(x))), 0) + gc;
   const over = total > cfg.sp;
-  return `<span class="sub">attack <span class="num">${n(a)}</span>　defense <span class="num">${n(d)}</span>　hp <span class="num">${n(h)}</span></span>
-    ${g != null ? `<span class="sub">guard ${g} → SP <span class="num">${gc}</span>${gc ? '（0.1 下げるごとに 1）' : '（0.5 なら 0）'}</span>` : ''}
+  // SP の数だけを並べる（guard も 0.3 ではなく 使った SP で見せる）
+  return `<span class="sub">attack <span class="num">${n(a)}</span>　defense <span class="num">${n(d)}</span>　hp <span class="num">${n(h)}</span>${g != null ? `　guard <span class="num">${gc}</span>` : ''}</span>
     <span class="${over ? 'bad' : 'sub'}">ごうけい <span class="num">${total}</span> / ${cfg.sp}${over ? '　つかいすぎ！' : total < cfg.sp ? `　のこり ${cfg.sp - total}` : ''}</span>`;
 }
 
