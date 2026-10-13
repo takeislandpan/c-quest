@@ -27,7 +27,7 @@ export const STAGE2 = {
   ],
   battles: [
     {
-      id: 'slime', name: 'スライム', place: '修練場の門', sprite: 'assets/zako2_1_slime.svg',
+      id: 'slime', name: 'スライム', place: '修練場の門', sprite: 'assets/zako2_1_slime.png',
       enemy: { name: 'スライム', hp: 12, def: 2, atk: 3, attackName: 'たいあたり' },
       task: 'attack の空欄（___）に 数を書こう（合計 30 まで）',
       template: body(['int attack = ___;', 'int defense = 10;', 'int hp = 10;', "char weapon = 'S';"], casts(3)),
@@ -45,7 +45,7 @@ export const STAGE2 = {
       hints: ['___ を消して数を書く。defense と hp で 20 使っているから、attack は 10 まで。', 'int attack = 10; にしてみよう。'],
     },
     {
-      id: 'goblin', name: 'ゴブリン', place: '武器庫あと', sprite: 'assets/zako2_2_goblin.svg',
+      id: 'goblin', name: 'ゴブリン', place: '武器庫あと', sprite: 'assets/zako2_2_goblin.png',
       enemy: { name: 'ゴブリン', hp: 20, def: 3, atk: 5, attackName: 'こんぼう' },
       task: '書いておいた詠唱を唱えてみよう',
       template: body(['int atack = 10;', 'int defense = 10;', 'int hp = 10;', "char weapon = 'S';"], casts(2)),
@@ -59,7 +59,7 @@ export const STAGE2 = {
       hints: ['戦う前の表示で、attack はいくつになっていた？', '1行目の箱の名前を magic.h と見比べよう。', 'int atack を int attack に直す。'],
     },
     {
-      id: 'koumori', name: 'コウモリ', place: '暗い回廊', sprite: 'assets/zako2_3_koumori.svg',
+      id: 'koumori', name: 'コウモリ', place: '暗い回廊', sprite: 'assets/zako2_3_koumori.png',
       enemy: { name: 'コウモリ', hp: 10, def: 0, atk: 4, attackName: 'かみつき' },
       task: '武器を ちゃんと 持とう',
       template: body(stats(10, 10, 10, "'s'"), casts(1)),
@@ -78,7 +78,7 @@ export const STAGE2 = {
       hints: ['戦う前の表示で、weapon は何と出ていた？', 'magic.h の武器の欄を見よう。剣は何という文字？', "char weapon = 'S'; にする。"],
     },
     {
-      id: 'ningyo', name: '魔法人形', place: '人形の間', sprite: 'assets/zako2_4_ningyo.svg',
+      id: 'ningyo', name: '魔法人形', place: '人形の間', sprite: 'assets/zako2_4_ningyo.png',
       stats: { sp: 30, mp: 4 },
       enemy: { name: '魔法人形', hp: 21, def: 0, atk: 6, attackName: 'まりょくだん' },
       task: '2回の攻撃で 人形を たおそう',
@@ -107,7 +107,7 @@ export const STAGE2 = {
       hints: ['戦う前の表示で、1回の攻撃のダメージはいくつ？', '7 × 1.5 = 10.5 は、ダメージにすると 10。切り捨てだ。', 'attack を 8 にする（どこかを 1 減らして合計 30 に）。8 × 1.5 = 12。'],
     },
     {
-      id: 'golem', name: 'ゴーレム', place: '石の広間', sprite: 'assets/zako2_5_golem.svg',
+      id: 'golem', name: 'ゴーレム', place: '石の広間', sprite: 'assets/zako2_5_golem.png',
       enemy: { name: 'ゴーレム', hp: 42, def: 7, atk: 11, attackName: 'いしの こぶし' },
       task: 'SPの 分け方を 変えて 倒そう',
       template: body(stats(10, 10, 10), casts(5)),
@@ -123,7 +123,7 @@ export const STAGE2 = {
       hints: ['ログを見よう。ゴーレムの残りHPは？ こちらの攻撃は1回いくつ？', '攻撃を 1 上げると 1.5倍で…… 11 × 1.5 = 16（切り捨て）、16 − 7 = 9。', 'attack を 11 にして、defense か hp を 1 減らす。'],
     },
     {
-      id: 'boss2', name: 'ボス 番人の鎧', place: '修練場の奥', sprite: 'assets/boss2_yoroi.svg', boss: true,
+      id: 'boss2', name: 'ボス 番人の鎧', place: '修練場の奥', sprite: 'assets/boss2_yoroi.png', boss: true,
       stats: { sp: 30, mp: 11 },
       enemy: {
         name: '番人の鎧', hp: 42, def: 5, atk: 9, attackName: 'きりつけ',
