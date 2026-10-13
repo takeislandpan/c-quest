@@ -74,12 +74,19 @@ button { font: inherit; color: inherit; }
 /* エディタ */
 .editor { flex-grow: 1; display: flex; font-family: var(--mono); font-size: 15px; line-height: 28px; min-height: 0; overflow: hidden; }
 .editor .gutter { width: 44px; flex-shrink: 0; text-align: right; padding: 10px 10px 0 0; color: var(--gutter); white-space: pre; overflow: hidden; }
-.editor textarea { flex-grow: 1; padding: 10px 10px 10px 10px; border: none; outline: none; resize: none; background: transparent; color: var(--text); font: inherit; line-height: inherit; white-space: pre; tab-size: 4; caret-color: var(--text); }
+.editor .field { flex-grow: 1; position: relative; min-width: 0; }
+.editor .hl, .editor textarea { position: absolute; inset: 0; margin: 0; padding: 10px; border: none; font: inherit; line-height: inherit; white-space: pre; tab-size: 4; overflow: auto; }
+.editor .hl { color: var(--text); pointer-events: none; overflow: hidden; }
+.editor textarea { outline: none; resize: none; background: transparent; color: transparent; caret-color: var(--text); }
+.editor textarea::selection { background: rgba(255, 209, 102, .3); }
+/* コードの色（ゲーム画面） */
+.hl-pp { color: #ffb86b; } .hl-str { color: var(--green); } .hl-esc { color: #7fd6e0; } .hl-kw { color: var(--violet); }
+.hl-fn { color: #8cc4ff; } .hl-num { color: #f7a8c4; } .hl-com { color: #8e9ab0; }
 .editor textarea::placeholder { color: var(--dim); }
 
 .codeview { display: flex; flex-direction: column; padding: 8px 0; font-family: var(--mono); font-size: 15px; line-height: 28px; overflow: auto; }
-.codeview .ln { padding-left: 12px; white-space: pre; color: var(--dim); }
-.codeview .ln.ran { color: var(--text); }
+.codeview .ln { padding-left: 12px; white-space: pre; color: var(--text); opacity: .45; }
+.codeview .ln.ran, .codeview .ln.cur, .codeview .ln.err { opacity: 1; }
 .codeview .ln.cur { padding-left: 9px; background: var(--hl); border-left: 3px solid var(--gold); color: var(--text); }
 .codeview .ln.err { padding-left: 9px; background: #3a1414; border-left: 3px solid var(--red); color: var(--text); }
 .codeview .no { display: inline-block; width: 28px; color: var(--gutter); }
@@ -135,7 +142,12 @@ button { font: inherit; color: inherit; }
 .pc .ed .name { padding: 8px 14px; border-bottom: 1px solid #e3e5ea; font-family: var(--mono); font-size: 14px; color: #4b5263; display: flex; align-items: center; }
 .pc .editor { font-size: 18px; line-height: 34px; color: #1f2430; }
 .pc .editor .gutter { color: #a0a6b4; }
-.pc .editor textarea { color: #1f2430; caret-color: #1f2430; }
+.pc .editor .hl { color: #1f2430; }
+.pc .editor textarea { caret-color: #1f2430; }
+.pc .editor textarea::selection { background: rgba(80, 120, 220, .25); }
+/* コードの色（現実のPC画面。明るい背景用） */
+.pc .hl-pp { color: #b05a00; } .pc .hl-str { color: #2f7d32; } .pc .hl-esc { color: #0b7a8a; } .pc .hl-kw { color: #7b3fb5; }
+.pc .hl-fn { color: #1f5fbf; } .pc .hl-num { color: #c2185b; } .pc .hl-com { color: #8a909c; }
 .pc .editor textarea::placeholder { color: #a0a6b4; }
 .pc .term { height: 190px; flex-shrink: 0; border-radius: 8px; background: #11131a; color: #d6dbe8; padding: 12px 16px; font-family: var(--mono); font-size: 15px; line-height: 26px; overflow: auto; cursor: text; }
 .pc .term .prompt { color: #8e9ab0; }

@@ -2,6 +2,7 @@
 import { preloadCompiler, compileAndRun } from './compiler.js';
 import { simulate, turnMessages, turnSummary } from './battle.js';
 import { explain } from './errors.js';
+import { highlightLine, highlight } from './highlight.js';
 import { STAGE1, PLAYER } from './data/stage1.js';
 import { newSave, loadSave, writeSave, battleRecord, recordAttempt, exportSave, importSave } from './save.js';
 
@@ -72,7 +73,7 @@ function codeViewHtml(code, marks = {}) {
   // marks: { [行番号]: { cls, tag } }
   return code.split('\n').map((t, i) => {
     const n = i + 1, m = marks[n] ?? {};
-    return `<div class="ln ${m.cls ?? ''}" data-line="${n}"><span class="no">${n}</span>${esc(t) || ' '}${m.tag ? `<span class="tag">${esc(m.tag)}</span>` : ''}</div>`;
+    return `<div class="ln ${m.cls ?? ''}" data-line="${n}"><span class="no">${n}</span>${highlightLine(t) || ' '}${m.tag ? `<span class="tag">${esc(m.tag)}</span>` : ''}</div>`;
   }).join('');
 }
 
@@ -130,7 +131,7 @@ function renderOpening() {
       <section>
         <div class="ed">
           <div class="name">hello.c<button class="runbtn" data-run>▶ 実行（Enter）</button></div>
-          <div class="editor"><div class="gutter" data-gutter>1</div><textarea data-code spellcheck="false"></textarea></div>
+          <div class="editor"><div class="gutter" data-gutter>1</div><div class="field"><pre class="hl" aria-hidden="true"></pre><textarea data-code spellcheck="false"></textarea></div></div>
         </div>
         <div class="term" data-term><div class="prompt">$ gcc hello.c -o hello &amp;&amp; ./hello</div><div class="prompt" data-hint>（Enter で実行）</div></div>
       </section>
@@ -194,14 +195,22 @@ function renderOpening() {
   term.addEventListener('click', run);
 }
 
+// textarea の後ろに色つきのコードを重ねて表示する（文字は透明にして、カーソルと選択だけ textarea が出す）
 function wireEditor(ta, gutter) {
+  const hl = ta.parentElement.querySelector('.hl');
+  const scroll = () => {
+    gutter.scrollTop = ta.scrollTop;
+    hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft;
+  };
   const sync = () => {
     const n = ta.value.split('\n').length;
     gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
-    gutter.scrollTop = ta.scrollTop;
+    // 最後が改行のとき pre は最終行の高さを持たないので1文字足す
+    hl.innerHTML = highlight(ta.value) + '\n ';
+    scroll();
   };
   ta.addEventListener('input', sync);
-  ta.addEventListener('scroll', () => { gutter.scrollTop = ta.scrollTop; });
+  ta.addEventListener('scroll', scroll);
   ta.addEventListener('keydown', e => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -415,7 +424,7 @@ function renderCode(id, { intro = true } = {}) {
       <div class="win grow" style="display:flex; flex-direction:column; background:var(--code-bg); overflow:hidden; min-height:0">
         <div class="win-title"><span class="mono" style="font-size:15px">${esc(id)}.c</span>
           <span class="sub">ちょうせん ${rec.attempts.length + 1}かいめ</span></div>
-        <div class="editor"><div class="gutter" data-gutter></div><textarea data-code spellcheck="false" placeholder="ここに 詠唱を かく（Ctrl+Enter で えいしょう）"></textarea></div>
+        <div class="editor"><div class="gutter" data-gutter></div><div class="field"><pre class="hl" aria-hidden="true"></pre><textarea data-code spellcheck="false" placeholder="ここに 詠唱を かく（Ctrl+Enter で えいしょう）"></textarea></div></div>
       </div>
       <div class="win" style="height:250px; flex-shrink:0; display:flex; flex-direction:column; background:var(--code-bg); overflow:hidden">
         <div class="win-title"><span class="mono" style="font-size:15px; color:var(--gold)">magic.h</span><span class="sub">よむだけ</span>
