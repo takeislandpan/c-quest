@@ -62,7 +62,7 @@ button { font: inherit; color: inherit; }
 
 /* 敵の場所 */
 .scene { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 10px; background: var(--scene); min-height: 0; }
-.sprite { width: 336px; height: 336px; image-rendering: pixelated; }
+.sprite { width: 336px; height: 336px; image-rendering: pixelated; object-fit: contain; flex-shrink: 1; min-height: 0; }
 .sprite.hit { animation: hit .35s steps(2) 2; }
 .sprite.gone { opacity: 0; transition: opacity .8s; }
 @keyframes hit { 50% { opacity: 0; } }
@@ -100,6 +100,9 @@ button { font: inherit; color: inherit; }
 .log .rows { overflow: auto; }
 .log .r { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.4fr) 44px 40px; column-gap: 8px; padding: 8px 12px; font-size: 15px; }
 .log .r.head { font-size: 13px; color: var(--muted); }
+.log .r.r6 { grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.4fr) 40px 36px 52px; }
+.log .r.note { grid-template-columns: 40px 1fr; font-size: 14px; }
+.status .bad, .msg .bad { color: var(--red-soft); }
 .log .r.cur { padding-left: 9px; background: var(--hl); border-left: 3px solid var(--gold); }
 .log .bad { color: var(--red); }
 

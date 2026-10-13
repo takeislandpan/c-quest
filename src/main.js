@@ -1,12 +1,16 @@
 // 画面の流れ: 冒頭(PC) → 転生 → 地図 → コードを書く → (魔導書が開かない) → 戦闘 → 勝ち/負け
 import { preloadCompiler, compileAndRun } from './compiler.js';
-import { simulate, turnMessages, turnSummary } from './battle.js';
+import { simulate, turnMessages, turnSummary, readStats, attackDamage } from './battle.js';
 import { explain } from './errors.js';
 import { highlightLine, highlight } from './highlight.js';
 import { STAGE1, PLAYER } from './data/stage1.js';
+import { STAGE2 } from './data/stage2.js';
 import { newSave, loadSave, writeSave, battleRecord, recordAttempt, exportSave, importSave } from './save.js';
 
 const stage = document.getElementById('stage');
+const STAGES = [STAGE1, STAGE2];
+const ALL = STAGES.flatMap((st, si) => st.battles.map(b => Object.assign(b, { stage: st, stageIndex: si })));
+const findBattle = id => ALL.find(b => b.id === id);
 const LICH_GARBLED = '師匠MP 縺ｾ縺?';
 let save = null;
 let compilerReady = false;
@@ -77,18 +81,56 @@ function codeViewHtml(code, marks = {}) {
   }).join('');
 }
 
-function statusHtml(hp, mp) {
+function statusHtml(hp, mp, p = null, enemy = null) {
+  // p があるとき（第2面から）: プログラムから読んだ強さも出す
+  const hpmp = `HP <span class="num ${hp <= 5 ? 'low' : ''}" data-hp>${hp}</span>　MP <span class="num" data-mp>${mp}</span>`;
+  return `<div class="win status" ${p ? 'style="width:440px"' : ''}>
+    ${p ? `<span>あなた　${hpmp}</span>` : `<span>あなた</span><span>${hpmp}</span>`}
+    ${p ? `<span>こうげき <span class="num">${p.atk}</span>　ぼうぎょ <span class="num">${p.def}</span>　ぶき <span class="${p.weapon.bare ? 'bad' : ''}">${esc(p.weapon.name)}${p.weapon.code ? `（'${p.weapon.code}'）` : ''}</span></span>
+    ${enemy ? `<span class="sub">attack 1回：${esc(damageExplain(p, enemy))}</span>` : ''}` : ''}
+  </div>`;
+}
+
+// 1回の attack で何ダメージになるかの説明（例: 7×1.5=10.5→10 −0 = 10）
+function damageExplain(p, enemy) {
+  const w = p.weapon;
+  if (w.bare) return '素手なので 0';
+  const exact = p.atk * w.mult, raw = Math.floor(exact);
+  let s = w.mult === 1 ? `${p.atk}` : `${p.atk}×${w.mult}=${Math.round(exact * 100) / 100}${exact !== raw ? `→${raw}` : ''}`;
+  if (w.ignoreDef) return `${s}（防御むし）MP${w.cost}`;
+  return `${s} −防御${enemy.def ?? 0} = ${attackDamage(p, enemy)}　MP${w.cost}`;
+}
+
+// 第2面からの「SP / MP」表示（書く前なので強さはまだ決まっていない）
+function spStatusHtml(cfg) {
   return `<div class="win status">
     <span>あなた</span>
-    <span>HP <span class="num ${hp <= 5 ? 'low' : ''}" data-hp>${hp}</span></span>
-    <span>MP <span class="num" data-mp>${mp}</span></span>
+    <span>SP <span class="num">${cfg.sp}</span>　MP <span class="num">${cfg.mp}</span></span>
+    <span class="sub">SP を attack / defense / hp に わける</span>
   </div>`;
+}
+
+// その戦闘での自分の強さ。第1面は固定、第2面からはプログラムの変数から読む
+function playerFor(b, res) {
+  if (b.stageIndex === 0) return { player: { ...PLAYER }, checks: [] };
+  return readStats(res?.vars, b.stats ?? b.stage.stats);
+}
+
+// 魔導書は面が進むとページ（章）が増える
+function reachedStage() {
+  let n = 0;
+  STAGES.forEach((st, i) => { if (i > 0 && battleRecord(save, STAGES[i - 1].battles.at(-1).id).cleared) n = i; });
+  return n;
+}
+function visibleMagic() {
+  const cut = magicH.indexOf(`\n/* === 第${reachedStage() + 2}章`);
+  return (cut >= 0 ? magicH.slice(0, cut) : magicH).replace(/\n$/, '');
 }
 
 function grimoire() {
   const ov = document.createElement('div');
   ov.className = 'overlay';
-  const lines = magicH.replace(/\n$/, '').split('\n');
+  const lines = visibleMagic().split('\n');
   ov.innerHTML = `<div class="win">
     <div class="win-title"><span class="mono" style="color: var(--gold)">magic.h</span><span class="sub">よむだけ。コンパイラが読む本物の中身</span>
     <button class="btn quiet" style="margin-left:auto; min-height:36px" data-close>とじる</button></div>
@@ -102,8 +144,7 @@ function grimoire() {
   ov.querySelector('[data-close]').focus();
 }
 
-function battleIndex(id) { return STAGE1.battles.findIndex(b => b.id === id); }
-function unlocked(i) { return i === 0 || battleRecord(save, STAGE1.battles[i - 1].id).cleared; }
+function unlocked(b) { const i = ALL.indexOf(b); return i === 0 || battleRecord(save, ALL[i - 1].id).cleared; }
 
 // ---------- ⓪ 冒頭: PCで Hello, World! ----------
 function renderOpening() {
@@ -287,21 +328,25 @@ async function renderPrologue() {
 
 // ---------- ⑥ 地図 ----------
 function renderMap(selectedId) {
-  const firstOpen = STAGE1.battles.find((b, i) => unlocked(i) && !battleRecord(save, b.id).cleared) ?? STAGE1.battles.at(-1);
+  const firstOpen = ALL.find(b => unlocked(b) && !battleRecord(save, b.id).cleared) ?? ALL.at(-1);
   let sel = selectedId ?? firstOpen.id;
+  const st = findBattle(sel).stage, si = STAGES.indexOf(st);
+  const stageOpen = i => i >= 0 && i < STAGES.length && unlocked(STAGES[i].battles[0]);
   const root = show(`<div class="screen" style="flex-direction:column">
     <div class="row" style="align-items:stretch">
       <div class="win grow" style="padding:12px 18px; display:flex; align-items:center; gap:16px">
-        <span style="font-size:22px; color:var(--gold)">${esc(STAGE1.title)}</span>
-        <span class="sub" style="font-size:14px">まなぶこと：${esc(STAGE1.learn)}</span>
+        <button class="btn quiet" data-stage="${si - 1}" ${stageOpen(si - 1) ? '' : 'disabled style="visibility:hidden"'} aria-label="まえの面">◀</button>
+        <span style="font-size:22px; color:var(--gold)">${esc(st.title)}</span>
+        <span class="sub" style="font-size:14px">まなぶこと：${esc(st.learn)}</span>
+        <button class="btn quiet" data-stage="${si + 1}" style="margin-left:auto; ${stageOpen(si + 1) ? '' : 'visibility:hidden'}" ${stageOpen(si + 1) ? '' : 'disabled'} aria-label="つぎの面">▶</button>
       </div>
       <div class="lichmp">${LICH_GARBLED}</div>
     </div>
     <div class="row grow" style="min-height:0">
       <nav class="win battle-list" aria-label="戦闘の一覧" style="width:440px; flex-shrink:0; padding:14px 10px; display:flex; flex-direction:column; gap:2px">
-        ${STAGE1.battles.map((b, i) => {
+        ${st.battles.map(b => {
           const rec = battleRecord(save, b.id);
-          return `<button class="item" data-id="${b.id}" ${unlocked(i) ? '' : 'disabled'}>
+          return `<button class="item" data-id="${b.id}" ${unlocked(b) ? '' : 'disabled'}>
             <span style="width:18px; color:var(--green)">${rec.cleared ? '✓' : '・'}</span>
             <span class="grow">${esc(b.name)}</span><span class="sub">${esc(b.place)}</span></button>`;
         }).join('')}
@@ -320,7 +365,7 @@ function renderMap(selectedId) {
   const select = id => {
     sel = id;
     items.forEach(it => it.classList.toggle('sel', it.dataset.id === id));
-    detail.innerHTML = detailHtml(STAGE1.battles.find(b => b.id === id));
+    detail.innerHTML = detailHtml(findBattle(id));
     detail.querySelector('[data-go]')?.addEventListener('click', () => renderCode(id));
     detail.querySelector('[data-cleared]')?.addEventListener('click', () => showCodeOverlay('クリアした コード', battleRecord(save, id).clearedCode));
     detail.querySelector('[data-history]')?.addEventListener('click', () => showHistory(id));
@@ -332,6 +377,10 @@ function renderMap(selectedId) {
     it.addEventListener('click', () => { pointer = false; sel === it.dataset.id ? renderCode(sel) : select(it.dataset.id); });
     it.addEventListener('focus', () => { if (!pointer) select(it.dataset.id); });
   });
+  root.querySelectorAll('[data-stage]').forEach(btn => btn.addEventListener('click', () => {
+    const next = STAGES[+btn.dataset.stage];
+    renderMap((next.battles.find(b => unlocked(b) && !battleRecord(save, b.id).cleared) ?? next.battles[0]).id);
+  }));
   root.querySelector('[data-export]').addEventListener('click', () => exportSave(save));
   const file = root.querySelector('[data-file]');
   root.querySelector('[data-import]').addEventListener('click', () => file.click());
@@ -376,6 +425,7 @@ function detailHtml(b) {
 }
 
 const ERROR_LABEL = {
+  blank: 'くうらん', 'char-quote': "' ' と \" \"", overload: 'SP つかいすぎ', bare: 'すで（ぶき なし）', 'zero-stat': '箱が よめない（0）',
   semicolon: '; ぬけ', include: '#include わすれ', 'header-missing': 'まどうしょの なまえ', unterminated: '" とじわすれ',
   brace: '{ } とじわすれ', paren: '( ) とじわすれ', undeclared: 'しらない ことば', main: 'main が ない', escape: '\\ の むき',
   other: 'そのほか', misfire: 'つづりミス（ふはつ）', glued: '\\n わすれ', 'no-mp': 'まりょくぎれ',
@@ -415,10 +465,10 @@ function showHistory(id) {
 
 // ---------- ① コードを書く ----------
 function renderCode(id, { intro = true } = {}) {
-  const b = STAGE1.battles.find(x => x.id === id);
+  const b = findBattle(id);
   const rec = battleRecord(save, id);
   const code = rec.code ?? b.template;
-  const hExcerpt = magicH.replace(/\n$/, '').split('\n');
+  const hExcerpt = visibleMagic().split('\n');
   const root = show(`<div class="screen">
     <section class="col" style="width:540px; flex-shrink:0">
       <div class="win grow" style="display:flex; flex-direction:column; background:var(--code-bg); overflow:hidden; min-height:0">
@@ -429,12 +479,12 @@ function renderCode(id, { intro = true } = {}) {
       <div class="win" style="height:250px; flex-shrink:0; display:flex; flex-direction:column; background:var(--code-bg); overflow:hidden">
         <div class="win-title"><span class="mono" style="font-size:15px; color:var(--gold)">magic.h</span><span class="sub">よむだけ</span>
           <button class="btn quiet" style="margin-left:auto; min-height:32px; font-size:13px" data-grim>おおきく ひらく</button></div>
-        <div class="codeview" style="font-size:14px; line-height:26px">${hExcerpt.map((t, i) => `<div class="ln" style="color:#8e9ab0"><span class="no">${i + 1}</span>${esc(t) || ' '}</div>`).join('')}</div>
+        <div class="codeview" data-hexcerpt style="font-size:14px; line-height:26px">${hExcerpt.map((t, i) => `<div class="ln" style="color:#8e9ab0"><span class="no">${i + 1}</span>${esc(t) || ' '}</div>`).join('')}</div>
       </div>
     </section>
     <section class="col grow">
       <div class="row" style="align-items:stretch">
-        ${statusHtml(PLAYER.hp, PLAYER.mp)}
+        ${b.stageIndex === 0 ? statusHtml(PLAYER.hp, PLAYER.mp) : spStatusHtml(b.stats ?? b.stage.stats)}
         <div class="grow"></div>
         <div class="lichmp">${LICH_GARBLED}</div>
       </div>
@@ -456,6 +506,10 @@ function renderCode(id, { intro = true } = {}) {
 
   const ta = root.querySelector('[data-code]');
   const msg = root.querySelector('[data-msg]');
+  // いまの面の章が見えるように、魔導書の抜き書きをその章まで送っておく
+  const hx = root.querySelector('[data-hexcerpt]');
+  const chapter = hExcerpt.findIndex(t => t.startsWith(`/* === 第${b.stageIndex + 1}章`));
+  if (chapter > 0) hx.scrollTop = chapter * 26;
   ta.value = code;
   wireEditor(ta, root.querySelector('[data-gutter]'));
   ta.addEventListener('input', () => { rec.code = ta.value; persist(); });
@@ -527,8 +581,17 @@ function renderCheck(b, code, diagnostics) {
 }
 
 // ---------- ③ 戦闘 ----------
+function logHead(enemy) {
+  return `<div class="r head ${enemy.mp ? 'r6' : ''}"><span>T</span><span>あなた</span><span>${esc(enemy.name)}</span><span>HP</span><span>MP</span>${enemy.mp ? '<span>てきMP</span>' : ''}</div>`;
+}
+function logRow(t, enemy, cls = '') {
+  const s = turnSummary(t, enemy);
+  return `<div class="r ${enemy.mp ? 'r6' : ''} ${cls}"><span>${t.turn}</span><span class="${s.bad ? 'bad' : ''}">${esc(s.you)}</span><span>${esc(s.foe)}</span><span>${t.hp}</span><span>${t.mp}</span>${enemy.mp ? `<span>${t.emp}</span>` : ''}</div>`;
+}
+
 function renderBattle(b, code, res) {
-  const { turns, result } = simulate(res.outputLines, PLAYER, b.enemy);
+  const { player, checks } = playerFor(b, res);
+  const { turns, result } = simulate(res.outputLines, player, b.enemy);
   const enemy = b.enemy;
   const root = show(`<div class="screen">
     <section class="col" style="width:540px; flex-shrink:0">
@@ -538,13 +601,13 @@ function renderBattle(b, code, res) {
       </div>
       <div class="win log">
         <div class="win-title"><span>せんとうログ</span><span class="sub">1ターン 1行</span></div>
-        <div class="r head"><span>T</span><span>あなた</span><span>${esc(enemy.name)}</span><span>HP</span><span>MP</span></div>
+        ${logHead(enemy)}
         <div class="rows" data-rows></div>
       </div>
     </section>
     <section class="col grow">
       <div class="row" style="align-items:flex-start">
-        ${statusHtml(PLAYER.hp, PLAYER.mp)}
+        ${statusHtml(player.hp, player.mp, b.stageIndex > 0 ? player : null, enemy)}
         <div class="grow"></div>
         <div class="lichmp" data-lich>${LICH_GARBLED}</div>
       </div>
@@ -555,6 +618,7 @@ function renderBattle(b, code, res) {
           <span>${esc(enemy.name)}</span>
           <div class="hpbar"><div data-ehpbar style="width:100%"></div></div>
           <span class="mono" data-ehp>${enemy.hp}/${enemy.hp}</span>
+          ${enemy.mp ? `<span class="mono" style="margin-left:8px">MP <span data-emp>${enemy.mp.start}</span>/${enemy.mp.max}</span>` : ''}
         </div>
       </div>
       <div class="row" style="height:200px; flex-shrink:0">
@@ -580,7 +644,10 @@ function renderBattle(b, code, res) {
     codeEl.querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
   };
   drawCode(0);
-  setMsg(msg, [`＊${esc(enemy.name)}が あらわれた！`]);
+  // 第2面から: 読み取った強さの問題を、戦う前に見せる
+  const opening = [`＊${esc(enemy.name)}が あらわれた！`];
+  if (b.stageIndex > 0) opening.push(...(checks.length ? checks.map(c => `<span class="bad">＊${esc(c.text)}</span>`) : ['＊ちからは ただしく よみとれた。']));
+  setMsg(msg, opening);
 
   let shown = 0, auto = null, finished = false;
   const step = () => {
@@ -588,11 +655,9 @@ function renderBattle(b, code, res) {
     if (shown >= turns.length) return finish();
     const t = turns[shown++];
     rows.querySelector('.cur')?.classList.remove('cur');
-    const s = turnSummary(t, enemy);
-    const row = document.createElement('div');
-    row.className = 'r cur';
-    row.innerHTML = `<span>${t.turn}</span><span class="${s.bad ? 'bad' : ''}">${esc(s.you)}</span><span>${esc(s.foe)}</span><span>${t.hp}</span><span>${t.mp}</span>`;
-    rows.appendChild(row); row.scrollIntoView({ block: 'nearest' });
+    rows.insertAdjacentHTML('beforeend', logRow(t, enemy, 'cur'));
+    const row = rows.lastElementChild;
+    row.scrollIntoView({ block: 'nearest' });
     drawCode(shown);
     $('[data-turnlabel]').textContent = `ターン ${t.turn}`;
     root.querySelector('[data-hp]').textContent = t.hp;
@@ -600,6 +665,7 @@ function renderBattle(b, code, res) {
     root.querySelector('[data-mp]').textContent = t.mp;
     $('[data-ehp]').textContent = `${t.ehp}/${enemy.hp}`;
     $('[data-ehpbar]').style.width = `${100 * t.ehp / enemy.hp}%`;
+    if (enemy.mp) $('[data-emp]').textContent = t.emp;
     if (t.ehp < t.ehpBefore) { sprite.classList.remove('hit'); void sprite.offsetWidth; sprite.classList.add('hit'); }
     if (t.hp < t.hpBefore) { const sc = root.querySelector('.scene'); sc.classList.remove('shake'); void sc.offsetWidth; sc.classList.add('shake'); }
     if (t.ehp === 0) sprite.classList.add('gone');
@@ -617,7 +683,12 @@ function renderBattle(b, code, res) {
     finished = true; stopAuto();
     const rec = battleRecord(save, b.id);
     const firstLose = !rec.attempts.some(a => a.result === 'lose');
-    const kinds = [...new Set(turns.flatMap(t => t.events.flatMap(e => e.kind === 'misfire' ? [e.glued ? 'glued' : 'misfire'] : e.kind === 'no-mp' ? ['no-mp'] : [])))];
+    const kinds = [...new Set([
+      ...(player.overload ? ['overload'] : []),
+      ...(player.weapon?.bare ? ['bare'] : []),
+      ...(b.stageIndex > 0 && checks.some(c => / が 0/.test(c.text)) ? ['zero-stat'] : []),
+      ...turns.flatMap(t => t.events.flatMap(e => e.kind === 'misfire' ? [e.glued ? 'glued' : 'misfire'] : e.kind === 'no-mp' ? ['no-mp'] : [])),
+    ])];
     recordAttempt(save, b.id, { code, result: result.kind, errorKinds: kinds, turns: turns.length, reason: result.reason ?? null });
     await persist(true);
     $('[data-nav]').innerHTML = '';
@@ -626,10 +697,10 @@ function renderBattle(b, code, res) {
       setMsg(msg, [`＊${esc(enemy.name)}を やっつけた！`]);
       await sleep(1000);
       await talk(msg, b.after);
-      if (b.boss) await bossClear(root);
-      const next = STAGE1.battles[battleIndex(b.id) + 1];
+      if (b.boss) await bossClear(root, b.stage);
+      const next = ALL[ALL.indexOf(b) + 1];
       $('[data-nav]').innerHTML = `${next ? '<button class="cmd" data-nextb>つぎへ すすむ</button>' : ''}<button class="cmd" data-map>ちず</button>`;
-      setMsg(msg, [b.boss ? '＊第1面 クリア！' : '＊しょうり！']);
+      setMsg(msg, [b.boss ? `＊${esc(b.stage.title.split(' ')[0])} クリア！` : '＊しょうり！']);
       root.querySelector('[data-nextb]')?.addEventListener('click', () => renderCode(next.id));
       root.querySelector('[data-map]').addEventListener('click', () => renderMap(next?.id ?? b.id));
       (root.querySelector('[data-nextb]') ?? root.querySelector('[data-map]')).focus();
@@ -637,34 +708,32 @@ function renderBattle(b, code, res) {
       await sleep(500);
       setMsg(msg, result.reason === 'out-of-spells'
         ? [`＊詠唱が つきた。 ${esc(enemy.name)}は まだ たっている……`, '＊あなたは ちからつきた。']
+        : result.reason === 'no-hp' ? ['＊hp が 0 では たっていられない！', '＊あなたは ちからつきた。']
         : ['＊あなたは ちからつきた。']);
       await sleep(1600);
-      renderDefeat(b, code, turns, result, firstLose);
+      renderDefeat(b, code, turns, result, firstLose, player, checks);
     }
   }
 }
 
-async function bossClear(root) {
+async function bossClear(root, st) {
   const lich = root.querySelector('[data-lich]');
   root.querySelector('[data-msg]').innerHTML = '';
   await sleep(300);
-  lich.textContent = '師匠MP ■■■■■■■■■□';
+  lich.textContent = `師匠MP ${st.lichGauge}`;
   lich.classList.add('revealed');
   await sleep(1600);
   lich.textContent = LICH_GARBLED;
   lich.classList.remove('revealed');
+  const nextStage = STAGES[STAGES.indexOf(st) + 1];
   await talk(root.querySelector('[data-msg]'), [
-    [null, '＊むらに もどると、村人たちが あなたの詠唱を ふしぎそうに 見ている。'],
-    ['村人', 'その呪文、ずいぶん古い書き方だねえ。ばあちゃんの昔話でしか聞いたことないよ。'],
-    ['師匠', '（小さく）……昔話、か。'],
-    ['師匠', '今のお前は、決まった言葉を順に唱えることしかできん。だが本物の魔法使いは、自分の力そのものを言葉で形にする。'],
-    ['師匠', '森の向こうに、昔の修練場がある。次はそこだ。'],
-    [null, '＊（第2面「変数と型」は まだ つくっている とちゅうです）'],
+    ...st.epilogue,
+    ...(nextStage ? [] : [[null, `＊（第${STAGES.length + 1}面は まだ つくっている とちゅうです）`]]),
   ]);
 }
 
 // ---------- ④ 負け → ログで振り返り ----------
-function renderDefeat(b, code, turns, result, firstLose) {
+function renderDefeat(b, code, turns, result, firstLose, player, checks) {
   const enemy = b.enemy;
   const rec = battleRecord(save, b.id);
   const marks = {};
@@ -677,13 +746,14 @@ function renderDefeat(b, code, turns, result, firstLose) {
       </div>
       <div class="win log">
         <div class="win-title"><span>せんとうログ</span><span class="sub">どこで まけた？</span></div>
-        <div class="r head"><span>T</span><span>あなた</span><span>${esc(enemy.name)}</span><span>HP</span><span>MP</span></div>
-        <div class="rows">${turns.map(t => { const s = turnSummary(t, enemy); return `<div class="r ${t === turns.at(-1) ? 'cur' : ''}"><span>${t.turn}</span><span class="${s.bad ? 'bad' : ''}">${esc(s.you)}</span><span>${esc(s.foe)}</span><span>${t.hp}</span><span>${t.mp}</span></div>`; }).join('')}
-        ${result.reason === 'out-of-spells' ? `<div class="r"><span>${turns.length + 1}</span><span class="bad">詠唱が つきた</span><span></span><span></span><span></span></div>` : ''}</div>
+        ${logHead(enemy)}
+        <div class="rows">${checks.map(c => `<div class="r note"><span></span><span class="bad">${esc(c.text)}</span></div>`).join('')}
+        ${turns.map(t => logRow(t, enemy, t === turns.at(-1) ? 'cur' : '')).join('')}
+        ${result.reason === 'out-of-spells' ? `<div class="r note"><span>${turns.length + 1}</span><span class="bad">詠唱が つきた</span></div>` : ''}</div>
       </div>
     </section>
     <section class="col grow">
-      <div class="row" style="align-items:stretch">${statusHtml(PLAYER.hp, PLAYER.mp)}<div class="grow"></div><div class="lichmp">${LICH_GARBLED}</div></div>
+      <div class="row" style="align-items:flex-start">${statusHtml(player.hp, player.mp, b.stageIndex > 0 ? player : null, enemy)}<div class="grow"></div><div class="lichmp">${LICH_GARBLED}</div></div>
       <div class="scene" style="background:#0d1226">
         <img class="sprite" src="assets/master_lich.png" alt="師匠リッチ" style="width:240px; height:240px">
         <span class="sub">あわい光が あなたを つつみ、HPと MPが もどった</span>

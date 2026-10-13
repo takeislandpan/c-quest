@@ -44,7 +44,8 @@ export function parseDiagnostics(log) {
   return items;
 }
 
-// 戻り値: { ok:false, diagnostics } または { ok:true, warnings, outputLines:[{text,line}], allocs, exitCode }
+// 戻り値: { ok:false, diagnostics } または { ok:true, warnings, outputLines:[{text,line}], vars, leaks, memEvents, exitCode }
+// vars: 最初の printf の時点の attack / defense / hp / weapon（weapon は文字コード）。printf が1回もなければ null
 export async function compileAndRun(source) {
   const check = await clang(source, []);
   const diagnostics = parseDiagnostics(check.log);
@@ -70,7 +71,7 @@ export async function compileAndRun(source) {
       stdout = stdout.slice(i + 1);
     }
   };
-  let errBuf = '';
+  let errBuf = '', vars = null;
   const exitCode = await runWasm(traced.wasm, {
     onStdout: t => { stdout += t; flush(); },
     onStderr: t => {
@@ -78,12 +79,13 @@ export async function compileAndRun(source) {
       while ((i = errBuf.indexOf('\n')) >= 0) {
         const l = errBuf.slice(0, i); errBuf = errBuf.slice(i + 1);
         if (!l.startsWith('\x01')) continue;
-        const [kind, line, ptr] = l.slice(1).split(' ');
-        if (kind === 'line') lineQueue.push(+line);
+        const [kind, line, ptr, ...rest] = l.slice(1).split(' ');
+        if (kind === 'vars') vars = { attack: +line, defense: +ptr, hp: +rest[0], weapon: +rest[1] };
+        else if (kind === 'line') lineQueue.push(+line);
         else { events.push({ kind, line: +line, ptr }); if (kind === 'malloc') allocs.set(ptr, +line); else allocs.delete(ptr); }
       }
     },
   });
   if (stdout) { outputLines.push({ text: stdout, line: lineQueue.shift() ?? null, noNewline: true }); }
-  return { ok: true, warnings: diagnostics, outputLines, leaks: [...allocs.values()], memEvents: events, exitCode };
+  return { ok: true, warnings: diagnostics, outputLines, vars, leaks: [...allocs.values()], memEvents: events, exitCode };
 }
