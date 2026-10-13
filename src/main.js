@@ -122,7 +122,7 @@ function renderOpening() {
       <article>
         <span style="font-size:13px; color:#6b7280">入門講座 ／ 第1回</span>
         <h1>まずは画面に文字を出してみよう</h1>
-        <p>プログラミングの最初の一歩は、画面に「Hello, World!」と表示すること。下のコードを右に打ち込んで、<b>Enter</b> で実行してみましょう。</p>
+        <p>プログラミングの最初の一歩は、画面に「Hello, World!」と表示すること。右にお手本のコードを入れておきました。<b>Enter</b> を押して実行してみましょう。</p>
         <pre class="sample">${sample}</pre>
         <p>うまく動いたら、あなたはもうプログラマーです。</p>
         <span data-prep style="margin-top:auto; font-size:12px; color:#9aa0ad"></span>
@@ -130,9 +130,9 @@ function renderOpening() {
       <section>
         <div class="ed">
           <div class="name">hello.c<button class="runbtn" data-run>▶ 実行（Enter）</button></div>
-          <div class="editor"><div class="gutter" data-gutter>1</div><textarea data-code spellcheck="false" placeholder="ここに打ち込む"></textarea></div>
+          <div class="editor"><div class="gutter" data-gutter>1</div><textarea data-code spellcheck="false"></textarea></div>
         </div>
-        <div class="term" data-term><div class="prompt">$ gcc hello.c -o hello &amp;&amp; ./hello</div><div class="prompt" data-hint>（コードを打ち終わったら Enter で実行）</div></div>
+        <div class="term" data-term><div class="prompt">$ gcc hello.c -o hello &amp;&amp; ./hello</div><div class="prompt" data-hint>（Enter で実行）</div></div>
       </section>
     </div>
     <div class="flash" data-flash></div>
@@ -142,8 +142,10 @@ function renderOpening() {
   const gutter = root.querySelector('[data-gutter]');
   const term = root.querySelector('[data-term]');
   const prep = root.querySelector('[data-prep]');
+  // お手本は最初から入れておく（毎回打つと話に入れないため）
+  ta.value = '#include <stdlich.h>\n\nint main(void) {\n    printf("Hello, World!\\n");\n    return 0;\n}\n';
   wireEditor(ta, gutter);
-  ta.focus();
+  root.querySelector('[data-run]').focus();
 
   const prepTimer = setInterval(() => {
     prep.textContent = compilerReady ? '' : `実行環境を準備しています… ${Math.round(compilerProgress * 100)}%`;
@@ -178,7 +180,7 @@ function renderOpening() {
     for (const g of ['Hello, Wor縺ｾ縺ｦ...', '縺薙・荳也阜縺ｸ', 'H̷e̸l̵l̶o̷,̴ ̸W̵o̷r̶l̸d̵.̷.̴.']) { print(esc(g), 'glitch'); await sleep(700); }
     root.querySelector('[data-flash]').classList.add('on');
     await sleep(2600);
-    renderPrologue();
+    renderAwaken();
   }
 
   const onKey = e => {
@@ -210,7 +212,38 @@ function wireEditor(ta, gutter) {
   sync();
 }
 
-// ---------- ⓪-2 転生して師匠に会う ----------
+// ---------- ⓪-2 目覚め: はじめから / 冒険の書を読み込む ----------
+// ブラウザのデータが消えたときも、冒険の書を読み込めば冒頭の話を飛ばして続きから遊べる
+function renderAwaken() {
+  const root = show(`<div class="screen fadein" style="flex-direction:column; align-items:center; justify-content:center; gap:24px">
+    <p style="margin:0; font-size:20px; line-height:1.8; text-align:center">＊……どこかで 古い本の ページが めくれる 音がする。</p>
+    <nav class="win cmds" aria-label="はじめかた" style="width:360px">
+      <button class="cmd" data-new>はじめから</button>
+      <button class="cmd" data-load>冒険の書を 魔導書に よみこむ</button>
+    </nav>
+    <p class="sub" data-note style="margin:0; min-height:1.6em; text-align:center"></p>
+    <input type="file" accept="application/json,.json" data-file hidden>
+  </div>`);
+  const file = root.querySelector('[data-file]');
+  const note = root.querySelector('[data-note]');
+  root.querySelector('[data-new]').addEventListener('click', renderPrologue);
+  root.querySelector('[data-load]').addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    if (!file.files[0]) return;
+    try {
+      save = await importSave(file.files[0]);
+      save.openingDone = true;
+      await persist(true);
+      renderMap();
+    } catch (e) {
+      note.textContent = `＊${e.message}。 もういちど えらんでね。`;
+      file.value = '';
+    }
+  });
+  root.querySelector('[data-new]').focus();
+}
+
+// ---------- ⓪-3 転生して師匠に会う ----------
 async function renderPrologue() {
   const root = show(`<div class="screen fadein" style="flex-direction:column">
     <div class="scene" style="background:#0a0f22">
