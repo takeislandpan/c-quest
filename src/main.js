@@ -97,7 +97,7 @@ function damageExplain(p, enemy) {
   if (w.bare) return '素手なので 0';
   const exact = p.atk * w.mult, raw = Math.floor(exact);
   let s = w.mult === 1 ? `${p.atk}` : `${p.atk}×${w.mult}=${Math.round(exact * 100) / 100}${exact !== raw ? `→${raw}` : ''}`;
-  if (w.ignoreDef) return `${s}（防御むし）MP${w.cost}`;
+  if (w.ignoreDef) return `${s}（防御むし）　MP${w.cost}`;
   return `${s} −防御${enemy.def ?? 0} = ${attackDamage(p, enemy)}　MP${w.cost}`;
 }
 
